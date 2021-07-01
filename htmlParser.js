@@ -31,105 +31,65 @@ document.getElementById('fileInput').addEventListener('change', function selecte
   reader.onload = function fileReadCompleted() { 
     let retorno = [-1,""];
     let linha = "";
+    var rg_data = /^([0-3][0-9]\/[0-1][0-9])$/
+    var rg_data_memo = /^([0-3][0-9]\/[0-1][0-9]) /
+    var rg_valor = /(- )?(\d+\.)?\d+(\,\d{1,2})/
+    var rg_nbsp = /&nbsp;/
+    var transacao = {data: "", memo: "", valor: "", parcela: ""}
+
     do {
       retorno = extraiProximaLinha(retorno[0]+1, reader.result);
-      linha = retorno[1].replace("<NOBR>", "").replace("</NOBR>", "")//.replace("&nbsp;", "")
-      //criarElemento(linha); 
-      //criarElemento(/(<TR>)/.test(linha))
-
-      if (/(<TR>)/.test(linha)) {
-        var transacao = "";
-        var memo = false; 
+      //linha = retorno[1].replace("<NOBR>", "").replace("</NOBR>", "")//.replace("&nbsp;", "")
+      
+      if (/(<TR>)/.test(retorno[1])) {
+        transacao = {data: "", memo: "", valor: "", parcela: ""}        }
         while (true) {
-          retorno = extraiProximaLinha(retorno[0]+1, reader.result);
-          linha = retorno[1].replace("<NOBR>", "").replace("</NOBR>", "")//.replace("&nbsp;", "")
-          //criarElemento(linha)
-          if (/(<\/TR>)/.test(linha))
-            break;
-          else {
-              if (/>&nbsp;<\/P/.test(linha)){
-                
-              } 
-              else if (/>([0-3][0-9]\/[0-1][0-9])/.test(linha)) {
-                transacao = transacao + />([0-3][0-9]\/[0-1][0-9])/.exec(linha)[0].substr(1) 
-                if (!memo) transacao = transacao + " | "
-                memo = false
-              }
-              else if (/(- )?(\d+\.)?\d+(\,\d{1,2})/.test(linha)) {
-                transacao = transacao + " | " + /(- )?(\d+\.)?\d+(\,\d{1,2})/.exec(linha)[0];
-                memo = false
-              }    
-              else if (/(<P.*>)(.*)(<\/P>)/.test(linha)) {
-                transacao = transacao + linha.match('<P.*>' + "(.*)" + '</P>')[1];  + " | "
-                memo = true;
-              } 
-              else
-                memo = false;
-          }
-        } ;
-        //criarElemento(transacao)
-        if (/^([0-3][0-9]\/[0-1][0-9] \|)/.test(transacao)) criarElemento(transacao);
-      }
- 
-      
-    } while (retorno[0] < reader.result.length);  
-  };
-  reader.readAsText(this.files[0]);
-});
-    
-/*    
-    var linha;
-    let linhaTD = true
-    let linhaP = true
-    let loopTR = false
-    let tipoLinha = "OUTRA"
-    var parteTransacao = "";
-    var transacao = "";
-    var memo = false;    
-    do {
-      retorno = extraiProximaLinha(retorno[0]+1, reader.result);
-      linha = retorno[1].replace("<NOBR>", "").replace("</NOBR>", "").replace("&nbsp;", "")
-     
-      if (/(<P.*>)(.*)(<\/P>)/.test(linha)) {linhaTD = true} else linhaTD = false; 
-      if (/(<TD)(.*)(TD>)/.test(linha)) {linhaP = true} else linhaP = false;
-      if (/(<TR>)/.test(linha)) {loopTR = true };
-      if (/(<\/TR>)/.test(linha)) {loopTR = false };
+            retorno = extraiProximaLinha(retorno[0]+1, reader.result);
+            retorno[1] = retorno[1].replace("<NOBR>", "").replace("</NOBR>", "")
+            if (/(<\/TR>)/.test(retorno[1]) || retorno[0] >= reader.result.length)
+                break;
+            else {
 
-      criarElemento(linha); 
-      criarElemento(loopTR + " " + linhaP + " " + linhaTD);
-      criarElemento(/>([0-3][0-9]\/[0-1][0-9])/.test(linha)); 
-      criarElemento(/(- )?(\d+\.)?\d+(\,\d{1,2})/.test(linha));
-      criarElemento(/(<P.*>)(.*)(<\/P>)/.test(linha))
-      
-      if (!loopTR) { 
-        if (/^([0-3][0-9]\/[0-1][0-9] \|)/.test(transacao)) {
-          console.log(transacao);
-          criarElemento(transacao);
+                if ( /<TD(.*)<\/TD>/.test(retorno[1]) && /(">)([^<>].*)(<\/P>)/.test(retorno[1])) {
+                    linha = /(">)([^<>].*)(<\/P>)/.exec(retorno[1])[0].replace('">', "").replace("</P>", "")
+
+                    if (rg_data.test(linha))  {
+                        if (transacao.data == "") 
+                          transacao.data = linha
+                        else {
+                          transacao.memo = transacao.memo + linha
+                          if (/([0-3][0-9]\/[0-1][0-9])/.test(transacao.memo))
+                            transacao.parcela = /([0-3][0-9]\/[0-1][0-9])/.exec(transacao.memo)[0]
+                        }
+                    }
+                    else if (rg_valor.test(linha)) {
+                        transacao.valor = linha 
+                    }
+                    else if (rg_data_memo.test(linha)) {
+                        transacao.data = linha.substr(0, 5)
+                        transacao.memo = linha.substr(6)
+                        if (/([0-3][0-9]\/[0-1][0-9])/.test(transacao.memo))
+                          transacao.parcela = /([0-3][0-9]\/[0-1][0-9])/.exec(transacao.memo)[0]
+                    }
+                    else if (rg_nbsp.test(linha)) {
+                    }
+                    else { 
+                        transacao.memo = linha
+                        if (/([0-3][0-9]\/[0-1][0-9])/.test(transacao.memo))
+                          transacao.parcela = /([0-3][0-9]\/[0-1][0-9])/.exec(transacao.memo)[0]
+                    }
+                  }
+            }
         }
-        transacao = "";
-        memo = false;
-      }
-       
-      if (/>([0-3][0-9]\/[0-1][0-9])/.test(linha)) {
-        transacao = transacao + />([0-3][0-9]\/[0-1][0-9])/.exec(linha)[0].substr(1) 
-        if (!memo) transacao = transacao + " | "
-        memo = false
-      }
-      else if (/(- )?(\d+\.)?\d+(\,\d{1,2})/.test(linha)) {
-        transacao = transacao + " | " + /(- )?(\d+\.)?\d+(\,\d{1,2})/.exec(linha)[0];
-        memo = false
-      }    
-      else if (/(<P.*>)(.*)(<\/P>)/.test(linha)) {
-        transacao = transacao + linha.match('<P.*>' + "(.*)" + '</P>')[1];  + " | "
-        memo = true;
-      } 
+        if (transacao.memo == "Compras parceladas - próximas faturas") {
+          criarElemento(transacao.data + " | " + transacao.memo + " | " + transacao.valor + " | " + transacao.parcela) }
+        if (transacao.data != "" ) {
+          criarElemento(transacao.data + " | " + transacao.memo + " | " + transacao.valor + " | " + transacao.parcela) } 
       
     } while (retorno[0] < reader.result.length);  
   };
   reader.readAsText(this.files[0]);
 });
-
-*/
    
 
 
